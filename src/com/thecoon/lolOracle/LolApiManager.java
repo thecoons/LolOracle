@@ -37,7 +37,7 @@ public class LolApiManager {
 		this.db = cli.getDatabase("LolOracle");
 	}
 
-	public void importGamesFromFeatureHistory(Region region, String collectionName)
+	public void importGamesFromFeatureHistory(Region region, String collectionName, Integer sleepTime)
 			throws RiotApiException, InterruptedException {
 
 		try {
@@ -49,16 +49,19 @@ public class LolApiManager {
 			for (CurrentGameInfo game : featGame.getGameList()) {
 				// Pour chaque joueurs
 				for (Participant jrs : game.getParticipants()) {
-					Thread.sleep(2000);
+
 					// On requête l'id du joueur
+					Thread.sleep(sleepTime);
 					Summoner sum = this.api.getSummonerByName(region, jrs.getSummonerName());
 					// On requête sont historique de matchs
+					Thread.sleep(sleepTime);
 					MatchList matchlist = this.api.getMatchList(region, sum.getId());
 
 					if (matchlist.getTotalGames() > 1) {
 						// Pour chaque matchs
 						for (MatchReference matchref : matchlist.getMatches()) {
 							Boolean flag = false;
+							Boolean win;
 							// On filtre le smatch Ranked
 							if (matchref.getQueue().equals("RANKED_SOLO_5x5")) {
 								// On creer un Document pour stocjer le match
@@ -66,16 +69,18 @@ public class LolApiManager {
 								Document team1 = new Document();
 								Document team2 = new Document();
 								// On récupére les détails du match
+								Thread.sleep(sleepTime);
 								MatchDetail match = this.api.getMatch(region, matchref.getMatchId());
+								win = match.getTeams().get(0).isWinner();
 								// Pour chaque joueurs
 								List<net.rithms.riot.dto.Match.Participant> arrpart = match.getParticipants();
 								Integer cpt = 0;
 								for (ParticipantIdentity part : match.getParticipantIdentities()) {
 									System.out.println(part.getPlayer().getSummonerId());
 									// On récupére ses stats en ranked
-									Document ply = playerToStatRanked(region, part, arrpart, cpt);
-									if(ply == null){
-										flag=true;
+									Document ply = playerToStatRanked(region, part, arrpart, cpt, sleepTime);
+									if (ply == null) {
+										flag = true;
 										break;
 									}
 									if (arrpart.get(cpt).getTeamId() == 100) {
@@ -83,14 +88,16 @@ public class LolApiManager {
 									} else {
 										team2.append(String.valueOf(arrpart.get(cpt).getChampionId()), ply);
 									}
-									docGame.append("team1", team1).append("team2", team2);
+									docGame.append("team1", team1).append("team2", team2).append("team1Win?", win);
 									cpt++;
-									Thread.sleep(2000);
-									
 
 								}
+								if (!flag) {
+									this.db.getCollection(collectionName).insertOne(docGame);
+									System.out.println(docGame.toJson());
+								}
 
-								System.out.println(docGame.toJson());
+								Thread.sleep(sleepTime);
 
 							}
 						}
@@ -104,12 +111,14 @@ public class LolApiManager {
 	}
 
 	private Document playerToStatRanked(Region region, ParticipantIdentity part,
-			List<net.rithms.riot.dto.Match.Participant> arrpart, Integer cpt) throws InterruptedException {
+			List<net.rithms.riot.dto.Match.Participant> arrpart, Integer cpt, Integer timesleep)
+					throws InterruptedException {
 		Document ply = null;
 		RankedStats plystat;
 		AggregatedStats stats = new AggregatedStats();
 		// TODO transformer en méthode
 		try {
+			Thread.sleep(timesleep);
 			plystat = this.api.getRankedStats(region, part.getPlayer().getSummonerId());
 			for (ChampionStats chpstat : plystat.getChampions()) {
 				// Quand on match le bon champion
@@ -164,7 +173,7 @@ public class LolApiManager {
 
 		LolApiManager api = new LolApiManager("48a2e66f-70a6-4b6d-af4a-bf626cb84dd3", "localhost", 27017);
 		try {
-			api.importGamesFromFeatureHistory(Region.EUW, "TrainingData01");
+			api.importGamesFromFeatureHistory(Region.EUW, "TrainingData01", 3500);
 		} catch (InterruptedException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
