@@ -18,6 +18,8 @@ import java.util.List;
 import java.util.Map;
 
 import com.mongodb.*;
+import com.mongodb.client.MongoDatabase;
+
 import org.bson.*;
 
 import net.rithms.riot.api.RiotApi;
@@ -27,12 +29,15 @@ import net.rithms.riot.constant.Region;
 public class LolApiManager {
 
 	private RiotApi api;
+	private MongoDatabase db;
 
-	public LolApiManager(String apiKey) {
+	public LolApiManager(String apiKey,String hostMongo,Integer portMongo) {
 		this.api = new RiotApi(apiKey);
+		MongoClient cli = new MongoClient(hostMongo,portMongo);
+		this.db = cli.getDatabase("LolOracle");
 	}
 
-	public void importGamesFromFeatureHistory(Region region) throws RiotApiException, InterruptedException {
+	public void importGamesFromFeatureHistory(Region region,String collectionName) throws RiotApiException, InterruptedException {
 		//On récupére les games en vitrine
 		FeaturedGames featGame = this.api.getFeaturedGames(region);
 		
@@ -61,41 +66,51 @@ public class LolApiManager {
 							Integer cpt = 0;
 							for(ParticipantIdentity part : match.getParticipantIdentities()){
 								//On récupére ses stats en ranked
-								//TODO Gerer l'absence de réponse
-								RankedStats plystat = this.api.getRankedStats(region, part.getPlayer().getSummonerId());
-								//Onj parcours les stats des ses champions 
-								for (ChampionStats chpstat : plystat.getChampions()) {
-									//Quand on match le bon champion
-									if(chpstat.getId() == arrpart.get(cpt).getChampionId() ){
-										//on récupére les stats du sum
-										AggregatedStats stats = chpstat.getStats();
-										//On creer un fichier bson pour le joueur
-										//TODO transformer en méthode
-										Document ply = new Document("id_sum",String.valueOf(part.getPlayer().getSummonerId()))
-												.append("champ_id", chpstat.getId())
-												.append("totalSession", stats.getTotalSessionsPlayed())
-												.append("avg_kill", stats.getTotalChampionKills()/stats.getTotalSessionsPlayed())
-												.append("avg_death", stats.getTotalDeathsPerSession()/stats.getTotalSessionsPlayed())
-												.append("avg_assist", stats.getTotalAssists()/stats.getTotalSessionsPlayed())
-												.append("avg_dmg_deal", stats.getTotalDamageDealt()/stats.getTotalSessionsPlayed())
-												.append("avg_dmg_taken", stats.getTotalDamageTaken()/stats.getTotalSessionsPlayed())
-												.append("avg_minions_kills", stats.getTotalMinionKills()/stats.getTotalSessionsPlayed())
-												.append("avg_turrets_kill", stats.getTotalTurretsKilled()/stats.getTotalSessionsPlayed());
-										
-										if(arrpart.get(cpt).getTeamId() == 100){
-											team1.append(arrpart.get(cpt).getTimeline().getLane(), ply);
-										}else{
-											team2.append(arrpart.get(cpt).getTimeline().getLane(), ply);
+								Thread.sleep(1000);
+								System.out.println(part.getPlayer().getSummonerId());
+								RankedStats plystat;
+								AggregatedStats stats = new AggregatedStats();
+								try{
+								 plystat = this.api.getRankedStats(region, part.getPlayer().getSummonerId());
+									for (ChampionStats chpstat : plystat.getChampions()) {
+										//Quand on match le bon champion
+										if(chpstat.getId() == arrpart.get(cpt).getChampionId() ){
+											//on récupére les stats du sum
+											 stats = chpstat.getStats();
+											//On creer un fichier bson pour le joueur
+												//TODO transformer en méthode
+												Document ply = new Document("id_sum",String.valueOf(part.getPlayer().getSummonerId()))
+														.append("champ_id", arrpart.get(cpt).getChampionId())
+														.append("totalSession", stats.getTotalSessionsPlayed())
+														.append("avg_kill", stats.getTotalChampionKills()/stats.getTotalSessionsPlayed())
+														.append("avg_death", stats.getTotalDeathsPerSession()/stats.getTotalSessionsPlayed())
+														.append("avg_assist", stats.getTotalAssists()/stats.getTotalSessionsPlayed())
+														.append("avg_dmg_deal", stats.getTotalDamageDealt()/stats.getTotalSessionsPlayed())
+														.append("avg_dmg_taken", stats.getTotalDamageTaken()/stats.getTotalSessionsPlayed())
+														.append("avg_minions_kills", stats.getTotalMinionKills()/stats.getTotalSessionsPlayed())
+														.append("avg_turrets_kill", stats.getTotalTurretsKilled()/stats.getTotalSessionsPlayed());
+												
+												if(arrpart.get(cpt).getTeamId() == 100){
+													team1.append(arrpart.get(cpt).getTimeline().getLane(), ply);
+												}else{
+													team2.append(arrpart.get(cpt).getTimeline().getLane(), ply);
+												}
+												docGame.append("team1", team1).append("team2", team2);
 										}
-										System.out.println(team1.toJson());
-										System.out.println(team2.toJson());
-										Thread.sleep(3000);
 									}
+									
+								}catch(RiotApiException e){
+									System.out.println(e);
+									
 								}
+								
+						
 								cpt++;
 								Thread.sleep(2000);
 								
 							}
+							
+							System.out.println(docGame.toJson());
 							
 						}
 					}
@@ -127,9 +142,9 @@ public class LolApiManager {
 		// long id = summoner.getId();
 		// System.out.println(id);
 
-		LolApiManager api = new LolApiManager("48a2e66f-70a6-4b6d-af4a-bf626cb84dd3");
+		LolApiManager api = new LolApiManager("48a2e66f-70a6-4b6d-af4a-bf626cb84dd3","localhost",27017);
 		try {
-			api.importGamesFromFeatureHistory(Region.EUW);
+			api.importGamesFromFeatureHistory(Region.EUW,"TrainingData01");
 		} catch (InterruptedException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
