@@ -18,9 +18,11 @@ import java.util.List;
 import java.util.Map;
 
 import com.mongodb.*;
+import com.mongodb.client.MongoCursor;
 import com.mongodb.client.MongoDatabase;
 
 import org.bson.*;
+import org.neuroph.core.data.DataSet;
 
 import net.rithms.riot.api.RiotApi;
 import net.rithms.riot.api.RiotApiException;
@@ -149,6 +151,18 @@ public class LolApiManager {
 
 	}
 
+	public DataSet getDataSetFromBDD(String collectionName) {
+		MongoCursor<Document> cur = this.db.getCollection(collectionName).find().iterator();
+		try {
+			while (cur.hasNext()) {
+				System.out.println(cur.next().toJson());
+			}
+		} finally {
+			cur.close();
+		}
+		return null;
+	}
+
 	public RiotApi getApi() {
 		return api;
 	}
@@ -161,7 +175,7 @@ public class LolApiManager {
 		return this.api.getFeaturedGames(region);
 	}
 
-	public static void main(String[] args) throws RiotApiException {
+	public static void main(String[] args) throws RiotApiException, InterruptedException {
 
 		// RiotApi api = new RiotApi("48a2e66f-70a6-4b6d-af4a-bf626cb84dd3");
 		//
@@ -172,11 +186,19 @@ public class LolApiManager {
 		// System.out.println(id);
 
 		LolApiManager api = new LolApiManager("48a2e66f-70a6-4b6d-af4a-bf626cb84dd3", "localhost", 27017);
-		try {
-			api.importGamesFromFeatureHistory(Region.EUW, "TrainingData01", 3500);
-		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+		while (true) {
+			try {
+				
+				System.out.println("Count : "+api.db.getCollection("TrainingData01").count());
+				api.importGamesFromFeatureHistory(Region.EUW, "TrainingData01", 3500);
+			} catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+				Thread.sleep(5000);
+			} catch (RiotApiException a) {
+				a.printStackTrace();
+				Thread.sleep(5000);
+			}
 		}
 
 	}
