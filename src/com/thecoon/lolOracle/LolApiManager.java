@@ -31,92 +31,112 @@ public class LolApiManager {
 	private RiotApi api;
 	private MongoDatabase db;
 
-	public LolApiManager(String apiKey,String hostMongo,Integer portMongo) {
+	public LolApiManager(String apiKey, String hostMongo, Integer portMongo) {
 		this.api = new RiotApi(apiKey);
-		MongoClient cli = new MongoClient(hostMongo,portMongo);
+		MongoClient cli = new MongoClient(hostMongo, portMongo);
 		this.db = cli.getDatabase("LolOracle");
 	}
 
-	public void importGamesFromFeatureHistory(Region region,String collectionName) throws RiotApiException, InterruptedException {
-		//On récupére les games en vitrine
-		FeaturedGames featGame = this.api.getFeaturedGames(region);
-		
-		//On parcours les games
-		for (CurrentGameInfo game : featGame.getGameList()) {
-			//Pour chaque joueurs
-			for (Participant jrs : game.getParticipants()) {
-				//On requête l'id du joueur
-				Summoner sum = this.api.getSummonerByName(region, jrs.getSummonerName());
-				//On requête sont historique de matchs
-				MatchList matchlist = this.api.getMatchList(region, sum.getId());
-				
-				if (matchlist.getTotalGames() > 1) {
-					//Pour chaque matchs
-					for (MatchReference matchref : matchlist.getMatches()) {
-						//On filtre le smatch Ranked
-						if (matchref.getQueue().equals("RANKED_SOLO_5x5")) {
-							//On creer un Document pour stocjer le match
-							Document docGame = new Document("game_id", String.valueOf(matchref.getMatchId()));	
-							Document team1 = new Document();
-							Document team2 = new Document();
-							//On récupére les détails du match
-							MatchDetail match = this.api.getMatch(region,matchref.getMatchId());
-							//Pour chaque joueurs
-							List<net.rithms.riot.dto.Match.Participant> arrpart = match.getParticipants();
-							Integer cpt = 0;
-							for(ParticipantIdentity part : match.getParticipantIdentities()){
-								//On récupére ses stats en ranked
-								Thread.sleep(1000);
-								System.out.println(part.getPlayer().getSummonerId());
-								RankedStats plystat;
-								AggregatedStats stats = new AggregatedStats();
-								try{
-								 plystat = this.api.getRankedStats(region, part.getPlayer().getSummonerId());
-									for (ChampionStats chpstat : plystat.getChampions()) {
-										//Quand on match le bon champion
-										if(chpstat.getId() == arrpart.get(cpt).getChampionId() ){
-											//on récupére les stats du sum
-											 stats = chpstat.getStats();
-											//On creer un fichier bson pour le joueur
-												//TODO transformer en méthode
-												Document ply = new Document("id_sum",String.valueOf(part.getPlayer().getSummonerId()))
-														.append("champ_id", arrpart.get(cpt).getChampionId())
-														.append("totalSession", stats.getTotalSessionsPlayed())
-														.append("avg_kill", stats.getTotalChampionKills()/stats.getTotalSessionsPlayed())
-														.append("avg_death", stats.getTotalDeathsPerSession()/stats.getTotalSessionsPlayed())
-														.append("avg_assist", stats.getTotalAssists()/stats.getTotalSessionsPlayed())
-														.append("avg_dmg_deal", stats.getTotalDamageDealt()/stats.getTotalSessionsPlayed())
-														.append("avg_dmg_taken", stats.getTotalDamageTaken()/stats.getTotalSessionsPlayed())
-														.append("avg_minions_kills", stats.getTotalMinionKills()/stats.getTotalSessionsPlayed())
-														.append("avg_turrets_kill", stats.getTotalTurretsKilled()/stats.getTotalSessionsPlayed());
-												
-												if(arrpart.get(cpt).getTeamId() == 100){
-													team1.append(arrpart.get(cpt).getTimeline().getLane(), ply);
-												}else{
-													team2.append(arrpart.get(cpt).getTimeline().getLane(), ply);
-												}
-												docGame.append("team1", team1).append("team2", team2);
-										}
+	public void importGamesFromFeatureHistory(Region region, String collectionName)
+			throws RiotApiException, InterruptedException {
+
+		try {
+
+			// On récupére les games en vitrine
+			FeaturedGames featGame = this.api.getFeaturedGames(region);
+
+			// On parcours les games
+			for (CurrentGameInfo game : featGame.getGameList()) {
+				// Pour chaque joueurs
+				for (Participant jrs : game.getParticipants()) {
+					Thread.sleep(2000);
+					// On requête l'id du joueur
+					Summoner sum = this.api.getSummonerByName(region, jrs.getSummonerName());
+					// On requête sont historique de matchs
+					MatchList matchlist = this.api.getMatchList(region, sum.getId());
+
+					if (matchlist.getTotalGames() > 1) {
+						// Pour chaque matchs
+						for (MatchReference matchref : matchlist.getMatches()) {
+							Boolean flag = false;
+							// On filtre le smatch Ranked
+							if (matchref.getQueue().equals("RANKED_SOLO_5x5")) {
+								// On creer un Document pour stocjer le match
+								Document docGame = new Document("game_id", String.valueOf(matchref.getMatchId()));
+								Document team1 = new Document();
+								Document team2 = new Document();
+								// On récupére les détails du match
+								MatchDetail match = this.api.getMatch(region, matchref.getMatchId());
+								// Pour chaque joueurs
+								List<net.rithms.riot.dto.Match.Participant> arrpart = match.getParticipants();
+								Integer cpt = 0;
+								for (ParticipantIdentity part : match.getParticipantIdentities()) {
+									System.out.println(part.getPlayer().getSummonerId());
+									// On récupére ses stats en ranked
+									Document ply = playerToStatRanked(region, part, arrpart, cpt);
+									if(ply == null){
+										flag=true;
+										break;
 									}
+									if (arrpart.get(cpt).getTeamId() == 100) {
+										team1.append(String.valueOf(arrpart.get(cpt).getChampionId()), ply);
+									} else {
+										team2.append(String.valueOf(arrpart.get(cpt).getChampionId()), ply);
+									}
+									docGame.append("team1", team1).append("team2", team2);
+									cpt++;
+									Thread.sleep(2000);
 									
-								}catch(RiotApiException e){
-									System.out.println(e);
-									
+
 								}
-								
-						
-								cpt++;
-								Thread.sleep(2000);
-								
+
+								System.out.println(docGame.toJson());
+
 							}
-							
-							System.out.println(docGame.toJson());
-							
 						}
 					}
 				}
 			}
+
+		} catch (RiotApiException e) {
+			System.out.println(e);
 		}
+	}
+
+	private Document playerToStatRanked(Region region, ParticipantIdentity part,
+			List<net.rithms.riot.dto.Match.Participant> arrpart, Integer cpt) throws InterruptedException {
+		Document ply = null;
+		RankedStats plystat;
+		AggregatedStats stats = new AggregatedStats();
+		// TODO transformer en méthode
+		try {
+			plystat = this.api.getRankedStats(region, part.getPlayer().getSummonerId());
+			for (ChampionStats chpstat : plystat.getChampions()) {
+				// Quand on match le bon champion
+				if (chpstat.getId() == arrpart.get(cpt).getChampionId()) {
+					// on récupére les stats du sum
+					stats = chpstat.getStats();
+					// On creer un fichier bson pour
+					// le joueur
+					ply = new Document("id_sum", String.valueOf(part.getPlayer().getSummonerId()))
+							.append("lane", arrpart.get(cpt).getTimeline().getLane())
+							.append("totalSession", stats.getTotalSessionsPlayed())
+							.append("avg_kill", stats.getTotalChampionKills() / stats.getTotalSessionsPlayed())
+							.append("avg_death", stats.getTotalDeathsPerSession() / stats.getTotalSessionsPlayed())
+							.append("avg_assist", stats.getTotalAssists() / stats.getTotalSessionsPlayed())
+							.append("avg_dmg_deal", stats.getTotalDamageDealt() / stats.getTotalSessionsPlayed())
+							.append("avg_dmg_taken", stats.getTotalDamageTaken() / stats.getTotalSessionsPlayed())
+							.append("avg_minions_kills", stats.getTotalMinionKills() / stats.getTotalSessionsPlayed())
+							.append("avg_turrets_kill", stats.getTotalTurretsKilled() / stats.getTotalSessionsPlayed());
+
+				}
+			}
+			return ply;
+
+		} catch (RiotApiException e) {
+			System.out.println(e);
+		}
+		return null;
 
 	}
 
@@ -142,9 +162,9 @@ public class LolApiManager {
 		// long id = summoner.getId();
 		// System.out.println(id);
 
-		LolApiManager api = new LolApiManager("48a2e66f-70a6-4b6d-af4a-bf626cb84dd3","localhost",27017);
+		LolApiManager api = new LolApiManager("48a2e66f-70a6-4b6d-af4a-bf626cb84dd3", "localhost", 27017);
 		try {
-			api.importGamesFromFeatureHistory(Region.EUW,"TrainingData01");
+			api.importGamesFromFeatureHistory(Region.EUW, "TrainingData01");
 		} catch (InterruptedException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
