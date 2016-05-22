@@ -151,16 +151,14 @@ public class LolApiManager {
 
 	}
 
-	public DataSet getDataSetFromBDD(String collectionName) {
-		MongoCursor<Document> cur = this.db.getCollection(collectionName).find().iterator();
-		try {
-			while (cur.hasNext()) {
-				System.out.println(cur.next().toJson());
-			}
-		} finally {
-			cur.close();
-		}
-		return null;
+	
+
+	public MongoDatabase getDb() {
+		return db;
+	}
+
+	public void setDb(MongoDatabase db) {
+		this.db = db;
 	}
 
 	public RiotApi getApi() {
