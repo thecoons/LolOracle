@@ -27,6 +27,7 @@ public class LolNeuralNetworkManager {
 		this.apiMan = api;
 	}
 
+	//TODO Nommer les attributs du DATASET
 	public DataSet getDataSetFromBDD(String collectionName) {
 		MongoCursor<Document> cur = this.apiMan.getDb().getCollection(collectionName).find().iterator();
 		DataSet dataset = new DataSet(80, 1);
@@ -64,8 +65,9 @@ public class LolNeuralNetworkManager {
 		return data;
 	}
 
-	public void exportCSV(DataSet data) throws IOException {
-		Writer fileWriter = new FileWriter("test.csv");
+	public void exportCSV(DataSet data,String namefile) throws IOException {
+		Writer fileWriter = new FileWriter(namefile);
+		System.out.println(data.getInputSize() + " " +data.getOutputSize()+ " "+data.size());
 		fileWriter.write(data.toCSV());
 		fileWriter.close();
 
@@ -105,8 +107,10 @@ public class LolNeuralNetworkManager {
 		LolApiManager api = new LolApiManager("48a2e66f-70a6-4b6d-af4a-bf626cb84dd3", "localhost", 27017);
 		LolNeuralNetworkManager nn = new LolNeuralNetworkManager(api);
 		DataSet data = nn.getDataSetFromBDD("TrainingData01");
+		DataSet data2 = nn.getDataSetFromBDD("Test01");
 		try {
-			nn.exportCSV(nn.noramlisationOfDataSet(data));
+			nn.exportCSV(nn.noramlisationOfDataSet(data),"train.csv");
+			nn.exportCSV(nn.noramlisationOfDataSet(data2),"test.csv");
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();

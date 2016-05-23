@@ -187,8 +187,8 @@ public class LolApiManager {
 		while (true) {
 			try {
 				
-				System.out.println("Count : "+api.db.getCollection("TrainingData01").count());
-				api.importGamesFromFeatureHistory(Region.EUW, "TrainingData01", 3500);
+				System.out.println("Count : "+api.db.getCollection("Test01").count());
+				api.importGamesFromFeatureHistory(Region.EUW, "Test01", 3500);
 			} catch (InterruptedException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
