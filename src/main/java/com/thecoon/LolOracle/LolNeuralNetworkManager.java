@@ -1,4 +1,4 @@
-package com.thecoon.lolOracle;
+package com.thecoon.LolOracle;
 
 import java.io.FileWriter;
 import java.io.IOException;

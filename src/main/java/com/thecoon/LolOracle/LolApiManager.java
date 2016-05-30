@@ -1,4 +1,4 @@
-package com.thecoon.lolOracle;
+package com.thecoon.LolOracle;
 
 import net.rithms.riot.dto.Summoner.*;
 import net.rithms.riot.dto.FeaturedGames.CurrentGameInfo;
@@ -44,7 +44,7 @@ public class LolApiManager {
 
 		try {
 
-			// On récupére les games en vitrine
+			// On recupere les games en vitrine
 			FeaturedGames featGame = this.api.getFeaturedGames(region);
 
 			// On parcours les games
@@ -52,10 +52,10 @@ public class LolApiManager {
 				// Pour chaque joueurs
 				for (Participant jrs : game.getParticipants()) {
 
-					// On requête l'id du joueur
+					// On requete l'id du joueur
 					Thread.sleep(sleepTime);
 					Summoner sum = this.api.getSummonerByName(region, jrs.getSummonerName());
-					// On requête sont historique de matchs
+					// On requete sont historique de matchs
 					Thread.sleep(sleepTime);
 					MatchList matchlist = this.api.getMatchList(region, sum.getId());
 
@@ -70,7 +70,7 @@ public class LolApiManager {
 								Document docGame = new Document("game_id", String.valueOf(matchref.getMatchId()));
 								Document team1 = new Document();
 								Document team2 = new Document();
-								// On récupére les détails du match
+								// On récupere les détails du match
 								Thread.sleep(sleepTime);
 								MatchDetail match = this.api.getMatch(region, matchref.getMatchId());
 								win = match.getTeams().get(0).isWinner();
@@ -79,7 +79,7 @@ public class LolApiManager {
 								Integer cpt = 0;
 								for (ParticipantIdentity part : match.getParticipantIdentities()) {
 									System.out.println(part.getPlayer().getSummonerId());
-									// On récupére ses stats en ranked
+									// On recupere ses stats en ranked
 									Document ply = playerToStatRanked(region, part, arrpart, cpt, sleepTime);
 									if (ply == null) {
 										flag = true;
@@ -118,14 +118,14 @@ public class LolApiManager {
 		Document ply = null;
 		RankedStats plystat;
 		AggregatedStats stats = new AggregatedStats();
-		// TODO transformer en méthode
+		// TODO transformer en methode
 		try {
 			Thread.sleep(timesleep);
 			plystat = this.api.getRankedStats(region, part.getPlayer().getSummonerId());
 			for (ChampionStats chpstat : plystat.getChampions()) {
 				// Quand on match le bon champion
 				if (chpstat.getId() == arrpart.get(cpt).getChampionId()) {
-					// on récupére les stats du sum
+					// on recupere les stats du sum
 					stats = chpstat.getStats();
 					// On creer un fichier bson pour
 					// le joueur
